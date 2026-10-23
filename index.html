@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#23356e">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Coronárias">
+<style>[hidden]{display:none!important} html,body{margin:0}</style>
+<title>Coronárias em Jogo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one phone-width column on millimetric ECG paper; every screen is a single card stack with the trace as the progress bar. */
+:root {
+  --paper: #fbf6f5;
+  --grid: rgba(207, 72, 86, 0.07);
+  --grid-major: rgba(207, 72, 86, 0.14);
+  --surface: #ffffff;
+  --surface-2: #f6eeee;
+  --line: #ead9da;
+  --ink: #1c2230;
+  --muted: #5d6474;
+  --accent: #23356e;
+  --accent-ink: #ffffff;
+  --trace: #cf3247;
+  --good: #17805a;
+  --good-bg: #e5f4ec;
+  --bad: #b42a2a;
+  --bad-bg: #fbe7e5;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111419; --grid: rgba(255, 96, 110, 0.05); --grid-major: rgba(255, 96, 110, 0.10);
+    --surface: #1a1f27; --surface-2: #222833; --line: #2c3340; --ink: #e9ecf2; --muted: #a2aaba;
+    --accent: #9db1ff; --accent-ink: #10162b; --trace: #ff5d70; --good: #45d19a; --good-bg: #15302a;
+    --bad: #ff7468; --bad-bg: #3a1e20; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111419; --grid: rgba(255, 96, 110, 0.05); --grid-major: rgba(255, 96, 110, 0.10);
+  --surface: #1a1f27; --surface-2: #222833; --line: #2c3340; --ink: #e9ecf2; --muted: #a2aaba;
+  --accent: #9db1ff; --accent-ink: #10162b; --trace: #ff5d70; --good: #45d19a; --good-bg: #15302a;
+  --bad: #ff7468; --bad-bg: #3a1e20; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 25px 25px, 25px 25px, 5px 5px, 5px 5px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Masthead */
+.mast { display: flex; flex-direction: column; gap: 4px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.brand { font-family: var(--font-display); font-stretch: 78%; font-weight: 800; font-size: clamp(34px, 9vw, 44px); line-height: 0.95; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.brand span { color: var(--trace); }
+.strip { width: 100%; height: 34px; display: block; }
+.strip path { fill: none; stroke: var(--trace); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+
+/* Home */
+.lead { margin: 0; color: var(--muted); }
+.modes { display: grid; gap: 10px; }
+.mode {
+  display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 14px;
+  text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px;
+}
+.mode:hover { border-color: var(--accent); }
+.mode .ic { width: 56px; height: 56px; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; }
+.mode .ic svg { width: 32px; height: 32px; fill: none; stroke: var(--trace); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mode h2 { font-family: var(--font-display); font-stretch: 90%; font-weight: 700; font-size: 20px; margin: 0; }
+.mode p { margin: 2px 0 0; font-size: 15px; color: var(--muted); }
+.mode .go { font-family: var(--font-mono); font-size: 13px; color: var(--accent); }
+
+.section-label { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 6px 0 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 14px; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip .n { font-family: var(--font-mono); font-size: 12px; opacity: 0.75; margin-left: 4px; }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.stat b { display: block; font-family: var(--font-mono); font-weight: 600; font-size: 20px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); }
+
+/* Shared play chrome */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.back { background: none; border: 0; padding: 6px 0; color: var(--accent); font-weight: 600; }
+.count { font-family: var(--font-mono); font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.monitor { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px 6px; }
+.monitor svg { width: 100%; height: 56px; display: block; }
+.monitor .done { fill: none; stroke: var(--trace); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+.monitor .todo { fill: none; stroke: var(--grid-major); stroke-width: 2; stroke-dasharray: 3 5; }
+.monitor .dot { fill: var(--trace); }
+.monitor .readout { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 12px; color: var(--muted); padding-top: 2px; }
+.monitor .readout strong { color: var(--trace); font-weight: 600; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.tag { align-self: flex-start; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--trace); border: 1px solid currentColor; border-radius: 6px; padding: 2px 8px; }
+.scenario { background: var(--surface-2); border-radius: 12px; padding: 12px 14px; font-size: 16px; }
+.scenario h3 { margin: 0 0 4px; font-family: var(--font-display); font-stretch: 90%; font-size: 16px; font-weight: 700; }
+.scenario p { margin: 0; }
+.q { font-family: var(--font-display); font-stretch: 92%; font-weight: 700; font-size: 21px; line-height: 1.22; margin: 0; text-wrap: balance; }
+.opts { display: flex; flex-direction: column; gap: 8px; }
+.opt {
+  display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; text-align: left;
+  background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px; font-size: 16px; line-height: 1.35;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt .k { font-family: var(--font-mono); font-weight: 600; width: 28px; height: 28px; border-radius: 8px; background: var(--surface-2); display: grid; place-items: center; font-size: 14px; }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--good); background: var(--good-bg); }
+.opt.right .k { background: var(--good); color: var(--surface); }
+.opt.wrong { border-color: var(--bad); background: var(--bad-bg); }
+.opt.wrong .k { background: var(--bad); color: var(--surface); }
+.opt.dim { opacity: 0.55; }
+
+.fb { border-left: 4px solid var(--good); padding: 4px 0 4px 12px; }
+.fb.no { border-left-color: var(--bad); }
+.fb h4 { margin: 0 0 4px; font-size: 16px; color: var(--good); }
+.fb.no h4 { color: var(--bad); }
+.fb p { margin: 0; font-size: 16px; }
+
+.btn { border: 0; border-radius: 12px; padding: 14px 18px; font-weight: 700; background: var(--accent); color: var(--accent-ink); font-size: 17px; }
+.btn.ghost { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row > .btn { flex: 1 1 140px; }
+
+/* Result */
+.score { font-family: var(--font-display); font-stretch: 75%; font-weight: 800; font-size: 64px; line-height: 1; margin: 0; font-variant-numeric: tabular-nums; }
+.score small { font-size: 28px; color: var(--muted); font-weight: 600; }
+.verdict { margin: 0; font-size: 18px; }
+.review { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.review li { border-top: 1px solid var(--line); padding-top: 10px; font-size: 15px; }
+.review b { display: block; margin-bottom: 2px; font-size: 16px; }
+.review .ans { color: var(--good); }
+
+/* Flashcards */
+.flip { perspective: 1200px; }
+.flip-inner {
+  display: grid; position: relative; transition: transform 0.5s cubic-bezier(.2,.7,.2,1); transform-style: preserve-3d;
+  border: 0; padding: 0; background: none; width: 100%; text-align: left;
+}
+.flip-inner.is-flipped { transform: rotateY(180deg); }
+.face {
+  grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px 20px;
+  min-height: 300px; display: flex; flex-direction: column; gap: 12px;
+}
+.face.back { transform: rotateY(180deg); background: var(--surface-2); }
+.face .front-q { font-family: var(--font-display); font-stretch: 85%; font-weight: 800; font-size: 28px; line-height: 1.1; margin: auto 0; text-wrap: balance; }
+.face .hint { font-family: var(--font-mono); font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.face .back-a { margin: 0; font-size: 17px; white-space: pre-line; }
+.known-badge { align-self: flex-start; font-family: var(--font-mono); font-size: 12px; color: var(--good); }
+.toggle { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--muted); }
+.toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+.empty { text-align: center; color: var(--muted); padding: 30px 10px; }
+
+.foot { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner { transition: none; }
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <span class="eyebrow">ICSC20 · UFBA · Fisioterapia Aplicada à Cardiologia</span>
+    <h1 class="brand">Coronárias <span>em Jogo</span></h1>
+    <svg class="strip" viewBox="0 0 560 34" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 22H70q6-7 12 0h10l4 5 6-25 6 30 4-10h14q8-9 16 0H210q6-7 12 0h10l4 5 6-25 6 30 4-10h14q8-9 16 0H350q6-7 12 0h10l4 5 6-25 6 30 4-10h14q8-9 16 0H560"/>
+    </svg>
+  </header>
+
+  <!-- HOME -->
+  <section id="home" class="wrap" style="gap:14px">
+    <p class="lead">Revisão da aula de Síndromes Coronarianas Agudas e Doença Arterial Coronariana. Escolha um modo.</p>
+    <div class="modes">
+      <button class="mode" id="go-quiz" type="button">
+        <span class="ic"><svg viewBox="0 0 32 32"><path d="M3 18h6l3-8 4 14 3-9h10"/></svg></span>
+        <span><h2>Quiz rápido</h2><p id="quiz-sub">12 perguntas sorteadas, com explicação</p></span>
+        <span class="go">→</span>
+      </button>
+      <button class="mode" id="go-cards" type="button">
+        <span class="ic"><svg viewBox="0 0 32 32"><rect x="5" y="8" width="18" height="20" rx="3"/><path d="M9 4h16a3 3 0 0 1 3 3v17"/></svg></span>
+        <span><h2>Cartões de estudo</h2><p id="cards-sub">Conceitos para memorizar</p></span>
+        <span class="go">→</span>
+      </button>
+      <button class="mode" id="go-case" type="button">
+        <span class="ic"><svg viewBox="0 0 32 32"><circle cx="16" cy="10" r="5"/><path d="M6 28c1-6 5-9 10-9s9 3 10 9"/></svg></span>
+        <span><h2>Caso Seu Edvaldo</h2><p>Do infarto à fase II: 9 decisões</p></span>
+        <span class="go">→</span>
+      </button>
+    </div>
+
+    <p class="section-label" id="filter-label">Filtrar quiz e cartões por bloco</p>
+    <div class="chips" id="chips" role="group" aria-labelledby="filter-label"></div>
+
+    <p class="section-label">Seu desempenho neste aparelho</p>
+    <div class="stats">
+      <div class="stat"><b id="st-quiz">—</b><span>melhor quiz</span></div>
+      <div class="stat"><b id="st-cards">0</b><span>cartões dominados</span></div>
+      <div class="stat"><b id="st-case">—</b><span>melhor no caso</span></div>
+    </div>
+    <p class="foot">Material de revisão da Profa. Dra. Séres Souza, 2026.2. O progresso fica salvo só neste celular.</p>
+  </section>
+
+  <!-- QUIZ / CASE -->
+  <section id="play" hidden>
+    <div class="wrap" style="gap:14px">
+      <div class="bar">
+        <button class="back" type="button" data-home>← Início</button>
+        <span class="count" id="p-count">1/12</span>
+      </div>
+      <div class="monitor" aria-hidden="true">
+        <svg viewBox="0 0 600 56" preserveAspectRatio="none"><path class="todo" id="tr-todo"/><path class="done" id="tr-done"/><circle class="dot" id="tr-dot" r="3.5"/></svg>
+        <div class="readout"><span>ACERTOS <strong id="p-score">0</strong></span><span id="p-mode">QUIZ</span></div>
+      </div>
+      <article class="panel" aria-live="polite">
+        <span class="tag" id="p-tag">Bloco</span>
+        <div class="scenario" id="p-scn" hidden><h3 id="p-scn-t"></h3><p id="p-scn-p"></p></div>
+        <h2 class="q" id="p-q"></h2>
+        <div class="opts" id="p-opts"></div>
+        <div class="fb" id="p-fb" hidden><h4 id="p-fb-t"></h4><p id="p-fb-p"></p></div>
+        <button class="btn" type="button" id="p-next" hidden>Próxima</button>
+      </article>
+    </div>
+  </section>
+
+  <!-- RESULT -->
+  <section id="result" hidden>
+    <div class="wrap" style="gap:14px">
+      <div class="bar"><button class="back" type="button" data-home>← Início</button><span class="count" id="r-mode"></span></div>
+      <div class="panel">
+        <p class="score" id="r-score">0<small>/12</small></p>
+        <p class="verdict" id="r-verdict"></p>
+        <div class="monitor" aria-hidden="true">
+          <svg viewBox="0 0 600 56" preserveAspectRatio="none"><path class="done" id="r-trace"/></svg>
+        </div>
+        <div class="row">
+          <button class="btn" type="button" id="r-again">Jogar de novo</button>
+          <button class="btn ghost" type="button" data-home>Início</button>
+        </div>
+      </div>
+      <div class="panel" id="r-review-wrap">
+        <h3 class="q" style="font-size:18px">Para revisar</h3>
+        <ul class="review" id="r-review"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- CARDS -->
+  <section id="cards" hidden>
+    <div class="wrap" style="gap:14px">
+      <div class="bar">
+        <button class="back" type="button" data-home>← Início</button>
+        <span class="count" id="c-count">1/26</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="c-only"> Mostrar só os que ainda não sei</label>
+      <div id="c-stage">
+        <div class="flip">
+          <button class="flip-inner" id="c-card" type="button" aria-label="Virar cartão">
+            <div class="face front">
+              <span class="tag" id="c-tag">Bloco</span>
+              <p class="front-q" id="c-front"></p>
+              <span class="hint">Toque para ver a resposta</span>
+            </div>
+            <div class="face back" aria-hidden="true">
+              <span class="tag" id="c-tag2">Resposta</span>
+              <p class="back-a" id="c-back"></p>
+              <span class="known-badge" id="c-known" hidden>✓ você marcou como sabido</span>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div class="empty" id="c-empty" hidden>Você marcou todos os cartões deste filtro como sabidos. Desmarque a opção acima para rever.</div>
+      <div class="row" id="c-actions">
+        <button class="btn ghost" type="button" id="c-later">Rever depois</button>
+        <button class="btn" type="button" id="c-know">Já sei</button>
+      </div>
+      <div class="row">
+        <button class="btn ghost" type="button" id="c-prev">← Anterior</button>
+        <button class="btn ghost" type="button" id="c-shuffle">Embaralhar</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const BLOCOS = {
+    1: "Placa e isquemia", 2: "O espectro", 3: "Prontuário", 4: "Reperfusão",
+    5: "Fase hospitalar", 6: "Reabilitação", 7: "Angina residual"
+  };
+
+  // First option is always the correct one; options are shuffled at render.
+  const QUIZ = [
+    { b: 1, q: "Por que o coração não consegue aumentar a oferta de O₂ extraindo mais oxigênio do sangue, como faz o músculo esquelético?", o: ["Porque já extrai cerca de 70–75% do O₂ em repouso; a única saída é aumentar o fluxo coronário", "Porque a hemoglobina do sangue coronário tem menos afinidade pelo O₂", "Porque o miocárdio funciona principalmente por metabolismo anaeróbio", "Porque o fluxo coronário ocorre só na sístole"], e: "O miocárdio extrai cerca de 70–75% do O₂ já em repouso; o músculo esquelético, cerca de 25%. Sem reserva de extração, mais demanda exige mais fluxo, e é aí que a placa limita." },
+    { b: 1, q: "Qual placa tem maior chance de romper e causar uma síndrome coronariana aguda?", o: ["Estenose de 40%, capa fibrosa fina, núcleo lipídico grande e muita inflamação", "Estenose de 80%, calcificada, com capa fibrosa grossa", "Estenose de 90%, com circulação colateral desenvolvida", "Estenose de 60%, fibrótica e sem núcleo lipídico"], e: "A maioria dos infartos nasce de placas vulneráveis, que muitas vezes estreitam menos de 50% da luz. Capa fina, núcleo grande e inflamação aumentam o risco de ruptura." },
+    { b: 1, q: "Na cascata isquêmica, qual é o ÚLTIMO evento a aparecer?", o: ["A angina", "A alteração do ECG", "A piora da contração do ventrículo", "A piora do relaxamento do ventrículo"], e: "Ordem: o fluxo cai → o relaxamento piora → a contração piora → o ECG muda → surge a angina. Por isso existe isquemia sem dor (isquemia silenciosa)." },
+    { b: 1, q: "A taquicardia piora a isquemia miocárdica por dois caminhos. Quais?", o: ["Aumenta o consumo de O₂ e encurta a diástole, quando o VE é irrigado", "Reduz a pré-carga e aumenta a extração de O₂", "Aumenta a pós-carga e dilata as coronárias", "Reduz a contratilidade e alonga a diástole"], e: "O fluxo coronário do VE ocorre principalmente na diástole. FC alta aumenta a demanda e reduz a oferta ao mesmo tempo." },
+    { b: 1, q: "Paciente na esteira com FC de 110 bpm e PAS de 150 mmHg. Qual é o duplo produto?", o: ["16.500", "260", "15.000", "11.000"], e: "Duplo produto = FC × PAS = 110 × 150 = 16.500. Ele estima o consumo de O₂ do miocárdio." },
+    { b: 1, q: "Qual paciente tem mais chance de ter isquemia silenciosa?", o: ["Idoso com diabetes", "Jovem atleta", "Adulto com angina estável que sempre sente dor", "Paciente com dor torácica que piora ao respirar"], e: "Pacientes com diabetes e idosos têm mais isquemia sem angina. Neles, observe sinais objetivos: PA, ECG, dispneia e fadiga súbita." },
+
+    { b: 2, q: "Dor no peito em repouso há 25 minutos, ECG com infradesnivelamento de ST e troponina normal nas dosagens seriadas. Qual o diagnóstico?", o: ["Angina instável", "IAM sem supra de ST", "IAM com supra de ST", "Angina estável"], e: "Angina em repouso por mais de 20 minutos é instável. Sem elevação de troponina não há necrose, logo não é infarto." },
+    { b: 2, q: "Qual exame separa a angina instável do IAM sem supra de ST?", o: ["Troponina, com curva de subida ou queda", "Eletrocardiograma em repouso", "Radiografia de tórax", "Teste ergométrico"], e: "Clínica e ECG podem ser iguais. A troponina sobe no IAM sem supra (há necrose) e não sobe na angina instável." },
+    { b: 2, q: "Qual é uma característica da angina ESTÁVEL?", o: ["Alivia com repouso ou nitrato sublingual em até 5 minutos", "Surge em repouso e dura mais de 20 minutos", "Piorou de frequência nas últimas semanas", "Vem sempre acompanhada de troponina elevada"], e: "Angina estável: gatilho previsível (esforço, emoção, frio, refeição pesada), sempre num nível parecido de esforço, dura poucos minutos e o padrão não muda." },
+    { b: 2, q: "No IAM com supra de ST, a necrose:", o: ["Começa no subendocárdio e avança para toda a espessura da parede", "Começa no epicárdio e avança para o endocárdio", "Fica sempre restrita ao subendocárdio", "Só começa depois de 12 horas de oclusão"], e: "Com oclusão total, a necrose começa no subendocárdio e avança como uma onda até o epicárdio, em poucas horas. Tempo é músculo." },
+    { b: 2, q: "Paciente séptico na UTI, taquicárdico e anêmico, com troponina elevada. O eco não mostra alteração segmentar nova. Pela 5ª definição de infarto (2026), o mais provável é:", o: ["Lesão miocárdica aguda, ainda não infarto", "IAM primário", "IAM relacionado a procedimento", "Angina instável"], e: "IAM secundário exige critério objetivo, como nova alteração segmentar ou perda de miocárdio viável. Sem isso, é lesão miocárdica. A conduta mira a doença de base." },
+    { b: 2, q: "Pela 5ª definição universal (2026), o infarto causado por ruptura de placa com trombo se chama:", o: ["IAM primário", "IAM secundário", "IAM tipo 1, que continua valendo", "IAM relacionado a procedimento"], e: "A numeração de tipos 1 a 5 foi substituída por três categorias: IAM primário, IAM secundário e IAM relacionado a procedimento." },
+
+    { b: 3, q: "Supradesnivelamento de ST de V1 a V4. Qual artéria é a mais provável e o que vigiar?", o: ["Descendente anterior; queda da FE, insuficiência cardíaca e arritmia ventricular", "Coronária direita; bradicardia e bloqueios", "Circunflexa; alteração discreta no ECG", "Coronária direita; nenhuma repercussão na mobilização"], e: "V1 a V4 = parede anterior e septal = descendente anterior. É o território que mais perde músculo." },
+    { b: 3, q: "IAM inferior (DII, DIII e aVF). O que vigiar com atenção na mobilização?", o: ["Bradicardia, bloqueios AV e hipotensão", "Edema agudo de pulmão logo no primeiro dia", "Hipertensão grave no esforço", "Nada: o IAM inferior é sempre benigno"], e: "A coronária direita costuma irrigar o nó AV. Vigie bradicardia, bloqueios e hipotensão; peça V3R e V4R para avaliar o ventrículo direito." },
+    { b: 3, q: "No ECG, onda T alterada, desnível do segmento ST e onda Q patológica representam, nessa ordem:", o: ["Isquemia, lesão e necrose", "Necrose, isquemia e lesão", "Lesão, necrose e isquemia", "Isquemia, necrose e lesão"], e: "Onda T = isquemia (músculo com fome). Segmento ST = lesão (sofrendo agora). Onda Q patológica = necrose (cicatriz)." },
+    { b: 3, q: "Troponina em ascensão desde ontem, paciente sem dor no momento. Qual a conduta para hoje?", o: ["Não progredir a atividade: o evento ainda está em curso", "Levar ao corredor, já que não há dor", "Iniciar exercício resistido", "Fazer o teste de caminhada de 6 minutos"], e: "Na troponina, a curva importa mais que o número. Em ascensão = evento em curso. Em queda e sem dor = sinal de estabilidade." },
+    { b: 3, q: "Paciente classificado como Killip III. O que isso significa para a fisioterapia?", o: ["Edema agudo de pulmão: a prioridade é a estabilização clínica e ventilatória", "Sem congestão: candidato à progressão precoce", "Choque cardiogênico: apenas suporte", "Estertores em bases: progredir normalmente"], e: "Killip I: sem congestão. II: estertores em bases, B3, turgência jugular. III: edema agudo de pulmão. IV: choque cardiogênico." },
+
+    { b: 4, q: "IAM com supra de ST há 3 horas. A angioplastia primária não pode ser feita em até 120 minutos. Qual a conduta?", o: ["Fibrinólise em até 10 minutos e transferência para centro com hemodinâmica", "Esperar a hemodinâmica, mesmo que demore 6 horas", "Cirurgia de revascularização de emergência", "Apenas observar e repetir a troponina"], e: "É a estratégia fármaco-invasiva. Se a trombólise falha: angioplastia de resgate. Se dá certo: cateterismo em 2 a 24 horas." },
+    { b: 4, q: "Sobre a trombólise no IAM SEM supra de ST e na angina instável:", o: ["Não traz benefício", "É a primeira escolha", "Deve ser feita em até 10 minutos", "Substitui o cateterismo"], e: "A trombólise só tem lugar no IAM com supra de ST. O principal risco é o sangramento, inclusive cerebral." },
+    { b: 4, q: "Qual sinal indica que a trombólise teve sucesso?", o: ["Queda de 50% ou mais do supra de ST em 60 a 90 minutos", "Aumento da troponina na primeira hora", "Aparecimento de onda Q", "FC acima de 120 bpm"], e: "Se o supra não cai, a trombólise falhou e o paciente vai para a angioplastia de resgate." },
+    { b: 4, q: "Qual destas é indicação clássica de revascularização cirúrgica (ponte)?", o: ["Lesão do tronco da coronária esquerda", "Lesão única de 70% na circunflexa", "Angina estável controlada com remédio", "IAM sem supra de baixo risco"], e: "Indicações: tronco da coronária esquerda; doença de três artérias, sobretudo com diabetes ou FE reduzida; anatomia sem condição de angioplastia; falha da angioplastia; complicação mecânica do IAM." },
+    { b: 4, q: "Paciente usando betabloqueador após o IAM. O que muda na sua monitorização?", o: ["A FC sobe pouco no esforço; some o Borg e a PA para julgar a intensidade", "A FC sobe mais que o normal; reduza a carga", "A PA fica sempre alta; suspenda o exercício", "Nada muda"], e: "O betabloqueador baixa a FC de repouso e atenua a resposta ao esforço. A FC sozinha deixa de ser um bom termômetro." },
+
+    { b: 5, q: "Qual achado IMPEDE iniciar a mobilização hoje?", o: ["Angina há 3 horas", "Troponina em queda", "PA de repouso de 130/80 mmHg", "FC de repouso de 78 bpm"], e: "Critérios: sem angina nas últimas 8 h; troponina estável ou em queda; sem IC nova; sem arritmia ou ECG novo em 8 h; PA < 180/110; FC < 120; sem aumento de droga vasoativa." },
+    { b: 5, q: "Pós-IAM, fase hospitalar, FC de repouso de 70 bpm. Qual o limite de FC na sessão?", o: ["90 bpm", "100 bpm", "120 bpm", "130 bpm"], e: "Após IAM: até 20 bpm acima do repouso. Após cirurgia: até 30 bpm. Nunca acima de 120 bpm na fase hospitalar." },
+    { b: 5, q: "Durante a caminhada no corredor, qual sinal é o MAIS grave?", o: ["PAS que cai mais de 10 mmHg com o aumento do esforço", "PAS que sobe 10 mmHg", "FC que sobe 12 bpm", "Borg 11"], e: "Regra de ouro: PA que cai no esforço é mais grave que PA que sobe. Sugere que o coração não consegue aumentar o débito." },
+    { b: 5, q: "Paciente no 3º dia após cirurgia de revascularização. Qual orientação está correta?", o: ["Levantar sem usar os braços para empurrar o corpo", "Apoiar nos braços para sair da cama", "Carregar a própria mala na alta", "Treino resistido de membros superiores desde já"], e: "Proteja o esterno: nada de usar os braços para empurrar o corpo ou levantar carga. Carga nos membros superiores só após a consolidação, em geral 6 a 8 semanas." },
+    { b: 5, q: "Durante a sessão, qual valor manda interromper?", o: ["SpO₂ de 88%", "Borg 12", "FC 15 bpm acima do repouso, pós-IAM", "PAS subindo de 120 para 128 mmHg"], e: "Interrompa com SpO₂ < 90%, angina, dispneia desproporcional, queda da PAS > 10 mmHg, PAS ≥ 220 ou PAD ≥ 110, arritmia nova ou BAV de 2º/3º grau, tontura, palidez, suor frio ou Borg > 13." },
+
+    { b: 6, q: "Teste ergométrico: angina e infra de ST de 1,5 mm surgiram na FC de 130 bpm. Qual a FC máxima de treino?", o: ["120 bpm", "130 bpm", "140 bpm", "Calcular por 220 menos a idade"], e: "Treine com FC pelo menos 10 bpm abaixo do limiar isquêmico: 130 − 10 = 120 bpm." },
+    { b: 6, q: "Por que não usar a FC máxima prevista (220 − idade) no coronariopata em uso de betabloqueador?", o: ["Porque o remédio reduz a FC alcançável; usa-se a FC do teste feito com a medicação habitual", "Porque a fórmula subestima a FC máxima", "Porque o betabloqueador aumenta a FC máxima", "Porque a FC não muda com o exercício"], e: "O teste de esforço é feito com os remédios de uso habitual. É dele que saem a FC de pico e o limiar isquêmico." },
+    { b: 6, q: "Na estratificação de risco da SBC, o paciente de alto risco:", o: ["Faz sessões supervisionadas, com mais vigilância", "Não pode fazer reabilitação", "Treina sozinho em casa", "Faz apenas exercício respiratório"], e: "Basta um critério de alto risco. Alto risco significa mais supervisão, não exclusão." },
+    { b: 6, q: "Pela diretriz europeia de reabilitação (ESC 2026), qual é o método preferido para definir a intensidade do treino aeróbico?", o: ["Limiares ventilatórios do teste cardiopulmonar", "FC de reserva (Karvonen)", "Classificação por METs", "220 menos a idade"], e: "A ESC 2026 prefere os limiares ventilatórios e desaconselha MET e Karvonen. A SBC 2020 ainda aceita Karvonen entre 40% e 80%." },
+    { b: 6, q: "Exercício resistido no coronariopata: qual orientação está correta?", o: ["Expirar na fase de força e nunca fazer manobra de Valsalva", "Prender a respiração para estabilizar o tronco", "Começar com 80% de 1RM", "Treinar todos os dias os mesmos grupos musculares"], e: "2 a 3 vezes por semana, em dias não consecutivos; 1 a 3 séries de 10 a 15 repetições; carga inicial de 30–40% de 1RM nos membros superiores e 50–60% nos inferiores." },
+    { b: 6, q: "Qual é a meta de LDL na prevenção secundária, segundo a ESC?", o: ["Abaixo de 55 mg/dL", "Abaixo de 100 mg/dL", "Abaixo de 130 mg/dL", "Abaixo de 160 mg/dL"], e: "Outras metas: PA < 130/80 mmHg, hemoglobina glicada < 7%, pelo menos 150 min por semana de atividade moderada, abandono do cigarro e vacina anual contra a gripe." },
+    { b: 6, q: "Quando a reabilitação ambulatorial deve começar, segundo a ESC 2026?", o: ["Idealmente em até 14 dias, no máximo em 30 dias", "Só depois de 6 meses", "Só depois da 2ª consulta com o cardiologista", "Quando o paciente quiser"], e: "O encaminhamento é feito ainda na internação. Encaminhamento automático e conversa individual com um profissional aumentam a adesão." },
+
+    { b: 7, q: "Na esteira, o paciente relata o início de um aperto no peito (angina nível 1). Qual é a primeira conduta?", o: ["Parar ou reduzir a carga, sentar o paciente, medir e registrar o limiar", "Terminar o tempo programado e depois avaliar", "Aumentar a carga para ver se a dor é mesmo cardíaca", "Pedir para respirar fundo e continuar"], e: "Ao primeiro sinal, interrompa. Registre carga, FC, PA, duplo produto, Borg e nível de angina: esse é o limiar isquêmico do paciente." },
+    { b: 7, q: "A angina continua depois de 5 minutos de repouso sentado. Qual o próximo passo?", o: ["Nitrato sublingual conforme a prescrição do paciente", "Retomar o exercício em carga menor", "Liberar o paciente para casa", "Deitar o paciente e esperar 30 minutos"], e: "Se não melhorar com repouso e nitrato, ou se o paciente instabilizar: protocolo de emergência, tratar como SCA. Comunique o cardiologista mesmo se a dor passar." },
+    { b: 7, q: "Nas últimas sessões, a angina passou a surgir em carga menor que antes. O que isso indica?", o: ["Possível instabilidade da placa: suspender o exercício e avaliação médica no mesmo dia", "Falta de condicionamento: aumentar o volume", "Efeito normal do betabloqueador", "Ansiedade: manter o treino"], e: "Angina que muda de padrão é angina instável até prova em contrário." },
+    { b: 7, q: "Qual destas NÃO é causa de angina residual?", o: ["Revascularização completa com stent pérvio", "Reestenose do stent", "Doença microvascular", "Espasmo da artéria coronária"], e: "Causas de angina residual: revascularização incompleta, reestenose do stent, doença microvascular e espasmo coronariano." },
+    { b: 7, q: "Qual ajuste ajuda o paciente com isquemia induzida pelo esforço?", o: ["Aquecimento longo, de 10 a 15 minutos", "Começar o treino já na intensidade alvo", "Treinar logo após uma refeição pesada", "Treinar em ambiente frio"], e: "O aquecimento longo eleva o limiar isquêmico. Também ajudam: intervalado de baixa intensidade, evitar frio e refeição pesada, e discutir o antianginoso com o cardiologista." }
+  ];
+
+  const CASE = [
+    { m: "Momento 1 · 5h da manhã", s: "Seu Edvaldo, 58 anos, motorista de aplicativo em Salvador. Fuma há 35 anos, tem diabetes e hipertensão. Acorda com aperto no peito irradiando para o braço esquerdo e suor frio. Na UPA, às 7h, o ECG mostra supra de ST de V1 a V4.", q: "Qual o diagnóstico e a artéria mais provável?", o: ["IAM com supra de ST anterior; descendente anterior", "IAM sem supra de ST; circunflexa", "Angina instável; coronária direita", "IAM com supra inferior; coronária direita"], e: "Supra de ST em V1–V4 = parede anterior/septal = descendente anterior. Diagnóstico clínico e eletrocardiográfico: ninguém espera a troponina para reperfundir." },
+    { m: "Momento 1 · a nova definição", s: "O infarto do Seu Edvaldo foi causado por ruptura de placa e trombo na DA.", q: "Em que categoria da 5ª definição de infarto (2026) ele se encaixa?", o: ["IAM primário", "IAM secundário", "IAM relacionado a procedimento", "IAM tipo 1, que continua valendo"], e: "Evento espontâneo por doença coronariana aguda = IAM primário." },
+    { m: "Momento 2 · a reperfusão", s: "Angioplastia primária com stent na DA proximal, acesso radial, fluxo TIMI 3. O cateterismo mostrou também uma lesão de 70% na coronária direita, não tratada. Eco: FE 42%, acinesia anterior e apical. Killip I.", q: "A revascularização foi completa? O que isso muda?", o: ["Não. A lesão residual na CD pode causar isquemia no esforço; o exercício precisa de teste e vigilância", "Sim. O stent resolveu a doença", "Não, mas lesão residual não interfere no exercício", "Sim, porque o fluxo ficou TIMI 3"], e: "TIMI 3 é o resultado ideal na culpada, mas sobrou território doente. É candidato a angina residual." },
+    { m: "Momento 3 · dia 2, na unidade coronariana", s: "Sem dor desde a angioplastia, em uso de betabloqueador. Deitado: FC 72, PA 118 × 74. Sentado: FC 76, PA 112 × 70. Em pé: FC 84, PA 98 × 64 e \"uma leve tontura\".", q: "Como você interpreta e o que faz?", o: ["Hipotensão ortostática: voltar a sentar, não progredir para a marcha nesta sessão e comunicar a equipe", "Resposta normal: seguir para o corredor", "Choque cardiogênico: acionar a emergência", "Sinal de reinfarto: suspender a fisioterapia por 7 dias"], e: "A PAS caiu 20 mmHg ao ficar em pé, com sintoma. Repouso no leito, betabloqueador e nitrato ajudam a explicar. Reavalie a prova ortostática na próxima sessão." },
+    { m: "Momento 3 · dia 3, no corredor", s: "Caminhada de 50 metros. A FC sobe de 74 para 90 bpm e o Borg chega a 14.", q: "Você progride, mantém ou reduz?", o: ["Mantém ou reduz: o Borg passou do alvo de 11 a 13", "Progride: a FC subiu menos de 20 bpm", "Progride para a escada", "Suspende a fisioterapia"], e: "A FC está dentro do limite (+16 bpm), mas o Borg 14 passou do alvo da fase hospitalar. Não progrida." },
+    { m: "Momento 4 · fase II, 4 semanas depois", s: "Teste ergométrico com betabloqueador: interrompido aos 6 METs por desconforto torácico leve, com infra de ST de 1,5 mm horizontal em V5–V6, na FC de 118 bpm e PA de 168 × 82.", q: "Qual a FC máxima de treino aeróbico?", o: ["108 bpm", "118 bpm", "128 bpm", "162 bpm (220 − 58)"], e: "Pelo menos 10 bpm abaixo do limiar isquêmico: 118 − 10 = 108 bpm. A fórmula 220 − idade não vale com betabloqueador e ignora o limiar." },
+    { m: "Momento 4 · o território", s: "O infra de ST apareceu em V5 e V6 durante o esforço.", q: "Esse achado localiza a artéria isquêmica?", o: ["Não. Infra de ST no esforço não localiza a artéria; o suspeito mais provável é a CD não tratada", "Sim, é isquemia da parede lateral (circunflexa)", "Sim, é a DA, onde está o stent", "Não, porque infra de ST não indica isquemia"], e: "Só o supra localiza. Comunique o cardiologista: o achado pode antecipar a revascularização da CD." },
+    { m: "Momento 5 · 6ª semana, na esteira", s: "Aos 15 minutos, Seu Edvaldo para de conversar, fica pálido e diz que \"está apertando\". FC 112 bpm, PA 128 × 80. No início da sessão a PA era 146 × 84.", q: "O que a queda da PA significa e o que você faz primeiro?", o: ["Isquemia com disfunção do VE; parar, sentar, medir e registrar, e seguir o protocolo", "Efeito do aquecimento; manter a carga", "Resposta normal ao treino; aumentar a hidratação", "Hipoglicemia; oferecer açúcar e continuar"], e: "PA que cai no esforço, com angina, é sinal de gravidade. Repouso sentado; se a dor persistir após 5 min, nitrato prescrito; se não melhorar, emergência. Comunique o médico mesmo se passar." },
+    { m: "Momento 5 · a semana seguinte", s: "Ele conta que parou o ticagrelor \"porque estava dando roxo\".", q: "Qual é o risco e o que você faz?", o: ["Trombose do stent; orientar a não suspender e comunicar o cardiologista no mesmo dia", "Nenhum risco; equimose é motivo para parar", "Risco de sangramento; apoiar a decisão dele", "Risco só de dor muscular; trocar por estatina"], e: "Parar a dupla antiagregação nos primeiros meses após o stent aumenta muito o risco de trombose do stent. Quem troca o remédio é o médico." }
+  ];
+
+  const CARDS = [
+    { b: 1, f: "Isquemia miocárdica", a: "Desequilíbrio entre a oferta e o consumo de oxigênio do miocárdio." },
+    { b: 1, f: "Os 3 determinantes do consumo de O₂ do miocárdio", a: "Frequência cardíaca\nForça de contração\nTensão da parede" },
+    { b: 1, f: "Duplo produto", a: "FC × PAS.\nEstima o consumo de O₂ do miocárdio. É o número que o fisioterapeuta controla à beira do leito." },
+    { b: 1, f: "Placa vulnerável", a: "Capa fibrosa fina (< 65 µm), núcleo de gordura grande, muita inflamação.\nMuitas vezes estreita menos de 50% da luz." },
+    { b: 1, f: "Cascata isquêmica, em ordem", a: "1. O fluxo cai\n2. O relaxamento piora\n3. A contração piora\n4. O ECG muda\n5. Surge a angina" },
+    { b: 1, f: "Isquemia silenciosa", a: "Isquemia sem angina.\nMais comum no paciente com diabetes e no idoso." },
+    { b: 1, f: "Quando começa a necrose após oclusão total?", a: "Cerca de 20 a 30 minutos.\nAvança do subendocárdio ao epicárdio em poucas horas. Tempo é músculo." },
+    { b: 2, f: "Angina estável", a: "Gatilho: esforço, emoção, frio ou refeição pesada.\nSempre num nível parecido de esforço.\nAlivia com repouso ou nitrato em até 5 min.\nPadrão sem mudança nas últimas semanas." },
+    { b: 2, f: "Angina instável: as 3 formas", a: "1. Em repouso, com mais de 20 min\n2. Nova e intensa\n3. Estável que piora em frequência, duração ou intensidade\nTroponina não sobe." },
+    { b: 2, f: "IAM sem supra × IAM com supra", a: "Sem supra: coágulo geralmente parcial, necrose subendocárdica, troponina alta.\nCom supra: coágulo geralmente total, necrose transmural, reperfusão imediata." },
+    { b: 2, f: "5ª definição de infarto (2026): as 3 categorias", a: "IAM primário\nIAM secundário\nIAM relacionado a procedimento\n(substituem os tipos 1 a 5)" },
+    { b: 2, f: "MINOCA (2026)", a: "Lesão miocárdica com coronárias não obstrutivas (estenose < 50%).\nDiagnóstico provisório, a ser investigado." },
+    { b: 3, f: "ECG: isquemia, lesão e necrose", a: "Isquemia = onda T\nLesão = segmento ST\nNecrose = onda Q patológica" },
+    { b: 3, f: "ECG: parede → artéria", a: "V1–V4: anterior → descendente anterior\nI, aVL, V5, V6: lateral → circunflexa\nDII, DIII, aVF: inferior → coronária direita" },
+    { b: 3, f: "Classificação de Killip", a: "I: sem congestão\nII: estertores em bases, B3\nIII: edema agudo de pulmão\nIV: choque cardiogênico" },
+    { b: 4, f: "Janela de reperfusão no IAM com supra", a: "Sintomas há menos de 12 h.\nAngioplastia primária se possível em até 120 min.\nSe não: trombólise em até 10 min do diagnóstico." },
+    { b: 4, f: "Estratégia fármaco-invasiva", a: "Trombólise + transferência.\nFalhou: angioplastia de resgate.\nDeu certo: cateterismo em 2 a 24 h." },
+    { b: 4, f: "Indicações de revascularização cirúrgica", a: "Tronco da coronária esquerda\nTrês artérias (sobretudo com diabetes ou FE reduzida)\nAnatomia sem condição de angioplastia\nFalha da angioplastia\nComplicação mecânica do IAM" },
+    { b: 5, f: "Critérios para iniciar a fase I", a: "Sem angina em 8 h\nTroponina estável ou em queda\nSem IC nova\nSem arritmia ou ECG novo em 8 h\nPA < 180/110 · FC < 120\nSem aumento de droga vasoativa" },
+    { b: 5, f: "Limites de FC na fase I", a: "Pós-IAM: até +20 bpm do repouso\nPós-cirurgia: até +30 bpm\nTeto: 120 bpm\nBorg entre 11 e 13" },
+    { b: 5, f: "Critérios para interromper a sessão", a: "Angina · dispneia desproporcional\nQueda da PAS > 10 mmHg\nPAS ≥ 220 ou PAD ≥ 110\nArritmia nova ou BAV 2º/3º\nSpO₂ < 90% · tontura, palidez, suor frio\nBorg > 13" },
+    { b: 6, f: "Limiar isquêmico", a: "FC ou duplo produto em que a angina ou o infra de ST surge no exercício.\nTeto de treino: pelo menos 10 bpm abaixo." },
+    { b: 6, f: "Aeróbico na fase II", a: "3 a 5 vezes por semana, 30 a 60 min\nAquecimento e desaquecimento de 5 a 10 min\nEntre LV1 e LV2 (ou 40–80% da FC de reserva)\nBorg 11 a 14" },
+    { b: 6, f: "Resistido na fase II", a: "2 a 3 vezes por semana, dias não consecutivos\n8 a 10 exercícios, 1 a 3 séries de 10 a 15 repetições\n30–40% de 1RM (MMSS), 50–60% (MMII)\nSem Valsalva" },
+    { b: 6, f: "Metas de prevenção secundária", a: "Sem cigarro · PA < 130/80\nLDL < 55 mg/dL · HbA1c < 7%\n≥ 150 min/semana de atividade moderada\nVacina anual contra gripe · saber quando ligar 192" },
+    { b: 7, f: "Causas de angina residual", a: "Revascularização incompleta\nReestenose do stent\nDoença microvascular\nEspasmo coronariano" }
+  ];
+
+  // ---------- storage (per device, optional) ----------
+  const KEY = "coronarias-em-jogo-v1";
+  let store = { bestQuiz: null, bestCase: null, known: {} };
+  try { const raw = localStorage.getItem(KEY); if (raw) store = Object.assign(store, JSON.parse(raw)); } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
+
+  const $ = (id) => document.getElementById(id);
+  const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  // ---------- filter ----------
+  let bloco = 0;
+  function renderChips() {
+    const wrap = $("chips"); wrap.innerHTML = "";
+    const opts = [[0, "Todos"]].concat(Object.entries(BLOCOS).map(([k, v]) => [Number(k), k + " · " + v]));
+    opts.forEach(([k, label]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.setAttribute("aria-pressed", String(bloco === k));
+      const n = k === 0 ? QUIZ.length : QUIZ.filter(x => x.b === k).length;
+      b.innerHTML = label + '<span class="n">' + n + "</span>";
+      b.addEventListener("click", () => { bloco = k; renderChips(); renderHome(); });
+      wrap.appendChild(b);
+    });
+  }
+  const pool = (list) => bloco === 0 ? list : list.filter(x => x.b === bloco);
+
+  // ---------- screens ----------
+  const screens = ["home", "play", "result", "cards"];
+  function show(id) { screens.forEach(s => { $(s).hidden = s !== id; }); window.scrollTo(0, 0); }
+  document.querySelectorAll("[data-home]").forEach(b => b.addEventListener("click", () => { renderHome(); show("home"); }));
+
+  function renderHome() {
+    const nq = Math.min(12, pool(QUIZ).length);
+    $("quiz-sub").textContent = nq + " perguntas sorteadas" + (bloco ? " do bloco " + bloco : "") + ", com explicação";
+    const nc = pool(CARDS).length;
+    $("cards-sub").textContent = nc + " cartões" + (bloco ? " do bloco " + bloco : "") + " para memorizar";
+    $("st-quiz").textContent = store.bestQuiz == null ? "—" : store.bestQuiz + "%";
+    $("st-case").textContent = store.bestCase == null ? "—" : store.bestCase + "/" + CASE.length;
+    const known = CARDS.filter((c, i) => store.known[i]).length;
+    $("st-cards").textContent = known + "/" + CARDS.length;
+  }
+
+  // ---------- ECG trace ----------
+  const W = 600, BASE = 34;
+  function beat(x, s) {
+    const p = (f) => (x + f * s).toFixed(1);
+    return "L" + p(0.12) + " " + BASE +
+      " Q" + p(0.19) + " " + (BASE - 7) + " " + p(0.26) + " " + BASE +
+      " L" + p(0.34) + " " + BASE +
+      " L" + p(0.38) + " " + (BASE + 5) +
+      " L" + p(0.44) + " " + (BASE - 28) +
+      " L" + p(0.50) + " " + (BASE + 10) +
+      " L" + p(0.55) + " " + BASE +
+      " L" + p(0.66) + " " + BASE +
+      " Q" + p(0.77) + " " + (BASE - 11) + " " + p(0.88) + " " + BASE +
+      " L" + p(1) + " " + BASE;
+  }
+  function flat(x, s) {
+    const p = (f) => (x + f * s).toFixed(1);
+    return "L" + p(0.3) + " " + BASE + " L" + p(0.36) + " " + (BASE + 2) + " L" + p(0.42) + " " + (BASE - 2) + " L" + p(0.48) + " " + BASE + " L" + p(1) + " " + BASE;
+  }
+  function tracePath(log, total) {
+    const s = W / Math.max(total, 1);
+    let d = "M0 " + BASE;
+    log.forEach((ok, i) => { d += " " + (ok ? beat(i * s, s) : flat(i * s, s)); });
+    return { d, x: log.length * s };
+  }
+
+  // ---------- quiz / case engine ----------
+  let game = null;
+  function startQuiz() {
+    const items = shuffle(pool(QUIZ)).slice(0, 12);
+    game = { kind: "quiz", items, i: 0, score: 0, log: [], misses: [] };
+    show("play"); renderQ();
+  }
+  function startCase() {
+    game = { kind: "case", items: CASE.slice(), i: 0, score: 0, log: [], misses: [] };
+    show("play"); renderQ();
+  }
+  function updateTrace() {
+    const t = tracePath(game.log, game.items.length);
+    $("tr-done").setAttribute("d", t.d);
+    $("tr-todo").setAttribute("d", "M" + t.x.toFixed(1) + " " + BASE + " L" + W + " " + BASE);
+    $("tr-dot").setAttribute("cx", t.x.toFixed(1)); $("tr-dot").setAttribute("cy", BASE);
+    $("p-score").textContent = game.score;
+  }
+  function renderQ() {
+    const it = game.items[game.i];
+    $("p-count").textContent = (game.i + 1) + "/" + game.items.length;
+    $("p-mode").textContent = game.kind === "quiz" ? "QUIZ" : "CASO";
+    if (game.kind === "case") {
+      $("p-tag").textContent = "Caso clínico";
+      $("p-scn").hidden = false; $("p-scn-t").textContent = it.m; $("p-scn-p").textContent = it.s;
+    } else {
+      $("p-tag").textContent = "Bloco " + it.b + " · " + BLOCOS[it.b];
+      $("p-scn").hidden = true;
+    }
+    $("p-q").textContent = it.q;
+    const opts = shuffle(it.o.map((t, k) => ({ t, ok: k === 0 })));
+    const box = $("p-opts"); box.innerHTML = "";
+    opts.forEach((op, k) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "opt";
+      b.innerHTML = '<span class="k">' + "ABCD"[k] + "</span><span></span>";
+      b.lastChild.textContent = op.t;
+      b.dataset.ok = op.ok ? "1" : "0";
+      b.addEventListener("click", () => answer(b));
+      box.appendChild(b);
+    });
+    $("p-fb").hidden = true; $("p-next").hidden = true;
+    updateTrace();
+  }
+  function answer(btn) {
+    const it = game.items[game.i];
+    const ok = btn.dataset.ok === "1";
+    $("p-opts").querySelectorAll(".opt").forEach(b => {
+      b.disabled = true;
+      if (b.dataset.ok === "1") b.classList.add("right");
+      else if (b === btn) b.classList.add("wrong");
+      else b.classList.add("dim");
+    });
+    game.log.push(ok);
+    if (ok) game.score++; else game.misses.push(it);
+    $("p-fb").hidden = false;
+    $("p-fb").classList.toggle("no", !ok);
+    $("p-fb-t").textContent = ok ? "Correto." : "Não é bem isso.";
+    $("p-fb-p").textContent = it.e;
+    const last = game.i === game.items.length - 1;
+    $("p-next").textContent = last ? "Ver resultado" : "Próxima";
+    $("p-next").hidden = false;
+    updateTrace();
+    $("p-next").focus({ preventScroll: true });
+    $("p-fb").scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
+  $("p-next").addEventListener("click", () => {
+    if (game.i < game.items.length - 1) { game.i++; renderQ(); window.scrollTo(0, 0); }
+    else finish();
+  });
+  function finish() {
+    const n = game.items.length, s = game.score, pct = Math.round(100 * s / n);
+    if (game.kind === "quiz") { if (store.bestQuiz == null || pct > store.bestQuiz) store.bestQuiz = pct; }
+    else { if (store.bestCase == null || s > store.bestCase) store.bestCase = s; }
+    save();
+    $("r-mode").textContent = game.kind === "quiz" ? "Quiz rápido" : "Caso Seu Edvaldo";
+    $("r-score").innerHTML = s + "<small>/" + n + "</small>";
+    $("r-verdict").textContent =
+      pct >= 90 ? "Ritmo sinusal. Você está pronto para a prova." :
+      pct >= 70 ? "Bom traçado. Revise os pontos abaixo e jogue de novo." :
+      pct >= 50 ? "Ritmo irregular. Volte aos cartões dos blocos em que errou." :
+      "Hora de estudar o dossiê da aula antes de tentar de novo.";
+    $("r-trace").setAttribute("d", tracePath(game.log, n).d);
+    const rv = $("r-review"); rv.innerHTML = "";
+    $("r-review-wrap").hidden = game.misses.length === 0;
+    game.misses.forEach(it => {
+      const li = document.createElement("li");
+      const b = document.createElement("b"); b.textContent = it.q;
+      const a = document.createElement("span"); a.className = "ans"; a.textContent = "Resposta: " + it.o[0];
+      li.appendChild(b); li.appendChild(a); rv.appendChild(li);
+    });
+    show("result");
+  }
+  $("r-again").addEventListener("click", () => { game.kind === "quiz" ? startQuiz() : startCase(); });
+
+  // ---------- flashcards ----------
+  let deck = [], ci = 0;
+  function buildDeck(shuf) {
+    let idx = CARDS.map((c, i) => i).filter(i => bloco === 0 || CARDS[i].b === bloco);
+    if ($("c-only").checked) idx = idx.filter(i => !store.known[i]);
+    deck = shuf ? shuffle(idx) : idx; ci = 0;
+  }
+  function renderCard() {
+    const empty = deck.length === 0;
+    $("c-stage").hidden = empty; $("c-actions").hidden = empty; $("c-empty").hidden = !empty;
+    $("c-card").classList.remove("is-flipped");
+    $("c-card").querySelector(".back").setAttribute("aria-hidden", "true");
+    $("c-card").querySelector(".front").removeAttribute("aria-hidden");
+    if (empty) { $("c-count").textContent = "0/0"; return; }
+    const i = deck[ci], c = CARDS[i];
+    $("c-count").textContent = (ci + 1) + "/" + deck.length;
+    $("c-tag").textContent = "Bloco " + c.b + " · " + BLOCOS[c.b];
+    $("c-tag2").textContent = "Bloco " + c.b + " · Resposta";
+    $("c-front").textContent = c.f;
+    $("c-back").textContent = c.a;
+    $("c-known").hidden = !store.known[i];
+  }
+  function nextCard() { if (deck.length) { ci = (ci + 1) % deck.length; renderCard(); } }
+  $("c-card").addEventListener("click", () => {
+    const flipped = $("c-card").classList.toggle("is-flipped");
+    $("c-card").querySelector(".back").setAttribute("aria-hidden", String(!flipped));
+    $("c-card").querySelector(".front").setAttribute("aria-hidden", String(flipped));
+  });
+  $("c-know").addEventListener("click", () => {
+    const i = deck[ci]; store.known[i] = true; save();
+    if ($("c-only").checked) { deck.splice(ci, 1); if (ci >= deck.length) ci = 0; renderCard(); } else nextCard();
+  });
+  $("c-later").addEventListener("click", () => {
+    const i = deck[ci]; delete store.known[i]; save(); nextCard();
+  });
+  $("c-prev").addEventListener("click", () => { if (deck.length) { ci = (ci - 1 + deck.length) % deck.length; renderCard(); } });
+  $("c-shuffle").addEventListener("click", () => { buildDeck(true); renderCard(); });
+  $("c-only").addEventListener("change", () => { buildDeck(false); renderCard(); });
+  function startCards() { buildDeck(false); renderCard(); show("cards"); }
+
+  $("go-quiz").addEventListener("click", startQuiz);
+  $("go-case").addEventListener("click", startCase);
+  $("go-cards").addEventListener("click", startCards);
+
+  renderChips(); renderHome();
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
+</body>
+</html>
